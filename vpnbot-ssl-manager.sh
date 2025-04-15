@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -euo pipefail
+set -u
 
 CONFIG_DIR="/root/vpnbot/config"
 CERTS_DIR="/root/vpnbot/certs" 
