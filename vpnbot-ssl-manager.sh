@@ -324,7 +324,7 @@ main() {
                 read -rp "Домен (например: sub.example.com): " domain
                 read -rp "IP и порт сервиса (например: 123.123.123.123:9000): " service_ip                
                 manage_nginx stop
-                issue_cert "$domain" && copy_cert
+                issue_cert "$domain" && copy_cert "$domain"
                 install_site "$domain" "$service_ip"
                 enable_auto_renew "$domain"
                 manage_nginx start
