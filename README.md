@@ -1,6 +1,5 @@
-# vpnbot-ssl-manager
 ![screenshot](https://hostux.pics/images/2025/04/15/imaged370a45bba17a530.png)
-## Запуск скрипта
+### Запуск скрипта
 
 Для запуска скрипта выполните следующую команду в терминале:
 
