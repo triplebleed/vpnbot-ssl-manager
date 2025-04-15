@@ -70,6 +70,7 @@ issue_cert() {
     fi
     
     echo "Выпускаем SSL-сертификат для $domain..."
+
     if [ -d "${LETSENCRYPT_DIR}/$domain" ]; then
         echo "SSL-сертификат для $domain уже существует."
         read -rp "Перевыпустить SSL-сертификат? (Y/N): " choice
@@ -77,7 +78,11 @@ issue_cert() {
             echo "Используем существующий SSL-сертификат."
             return 0
         fi
+
         echo "Перевыпускаем SSL-сертификат..."
+        echo "Удаляем существующий сертификат для $domain..."
+        sudo certbot delete --non-interactive --cert-name "$domain"
+
     fi
 
     if ! sudo certbot certonly --cert-name "$domain" --standalone --agree-tos -d "$domain"; then
