@@ -80,7 +80,7 @@ issue_cert() {
         echo "Перевыпускаем SSL-сертификат..."
     fi
 
-    if ! sudo certbot certonly --standalone --non-interactive -d "$domain"; then
+    if ! sudo certbot certonly --cert-name "$domain" --standalone --agree-tos -d "$domain"; then
         echo "Ошибка: Не удалось выпустить SSL-сертификат для $domain."
         return 1
     fi
@@ -122,7 +122,7 @@ remove_cert() {
     fi
     
     echo "Удаляем SSL-сертификат для $domain..."
-    if ! echo "Y" | sudo certbot delete --non-interactive --cert-name "$domain"; then
+    if ! sudo certbot delete --non-interactive --cert-name "$domain"; then
         echo "Ошибка: Не удалось удалить SSL-сертификат для $domain."
         return 1
     fi
