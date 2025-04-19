@@ -9,138 +9,73 @@ RESET="\033[0m"
 CONFIG_DIR="/root/vpnbot/config"
 CERTS_DIR="/root/vpnbot/certs" 
 INCLUDE_CONF="${CONFIG_DIR}/include.conf"
-LETSENCRYPT_DIR="/etc/letsencrypt/live"
 
 init() {
     NGINX_CONTAINER_NAME=$(docker ps -a --format "{{.Names}}" | grep -E '^nginx-' | head -n 1)
-
     if [ -z "$NGINX_CONTAINER_NAME" ]; then
         echo -e "${RED}Ошибка: Не найден контейнер nginx.${RESET}"
         exit 1
     fi
     
-    if [ "$(docker inspect -f '{{.State.Running}}' "$NGINX_CONTAINER_NAME")" != "true" ]; then
-        echo -e "${RED}\nВНИМАНИЕ: Контейнер $NGINX_CONTAINER_NAME не запущен!${RESET}"
-        echo -e "${RED}Операции по установке будут работать некорректно.${RESET}"
-        read -rp "Продолжить без запуска контейнера? (Y/N): " choice
-        if [[ ! "$choice" =~ ^[Yy]$ ]]; then
-            echo "Выход из программы."
-            exit 0
-        fi
-        echo "Продолжаем работу с незапущенным контейнером..."
+    PHP_CONTAINER_NAME=$(docker ps -a --format "{{.Names}}" | grep -E '^php-' | head -n 1)
+    if [ -z "$PHP_CONTAINER_NAME" ]; then
+        echo -e "${RED}Ошибка: Не найден контейнер PHP.${RESET}"
+        exit 1
     fi
+    
 }
 
-manage_nginx() {
-    local action=$1
-    
-    case "$action" in
-        stop)
-            echo "Останавливаем контейнер $NGINX_CONTAINER_NAME..."
-            if ! docker stop "$NGINX_CONTAINER_NAME" > /dev/null; then
-                echo -e "${RED}Ошибка: Не удалось остановить контейнер $NGINX_CONTAINER_NAME.${RESET}"
-                return 1
-            fi
-            echo -e "${GREEN}Контейнер $NGINX_CONTAINER_NAME успешно остановлен!${RESET}"
-            ;;
-        start)
-            echo "Запускаем контейнер $NGINX_CONTAINER_NAME..."
-            if ! docker start "$NGINX_CONTAINER_NAME" > /dev/null; then
-                echo -e "${RED}Ошибка: Не удалось запустить контейнер $NGINX_CONTAINER_NAME.${RESET}"
-                return 1
-            fi
-            echo -e "${GREEN}Контейнер $NGINX_CONTAINER_NAME успешно запущен!${RESET}"
-            ;;
-        restart)
-            echo "Перезапускаем контейнер $NGINX_CONTAINER_NAME..."
-            if ! docker restart "$NGINX_CONTAINER_NAME" > /dev/null; then
-                echo -e "${RED}Ошибка: Не удалось перезапустить контейнер $NGINX_CONTAINER_NAME.${RESET}"
-                return 1
-            fi
-            echo -e "${GREEN}Контейнер $NGINX_CONTAINER_NAME успешно перезапущен!${RESET}"
-            ;;
-    esac
-    
-    return 0
+restart_nginx() {
+    echo "Перезапускаем контейнер $NGINX_CONTAINER_NAME..."
+    docker restart "$NGINX_CONTAINER_NAME" > /dev/null && \
+        echo -e "${GREEN}Контейнер $NGINX_CONTAINER_NAME перезагружен.${RESET}" || \
+        echo -e "${RED}Ошибка: не удалось перезапустить контейнер $NGINX_CONTAINER_NAME.${RESET}"
 }
 
 issue_cert() {
     local domain=$1
-    
-    if ! command -v certbot &> /dev/null; then
-        echo "Certbot не установлен. Установка..."
-        sudo apt update
-        sudo apt install -y certbot
-    fi
+    local cert_dir="${CERTS_DIR}/$domain"
     
     echo "Выпускаем SSL-сертификат для $domain..."
 
-    if [ -d "${LETSENCRYPT_DIR}/$domain" ]; then
-        echo "SSL-сертификат для $domain уже существует."
-        read -rp "Перевыпустить SSL-сертификат? (Y/N): " choice
+    if [ -d "$cert_dir" ] && [ -f "$cert_dir/fullchain.pem" ] && [ -f "$cert_dir/privkey.pem" ]; then
+        read -rp "SSL-сертификат уже существует в ${CERTS_DIR}. Перевыпустить? (Y/N): " choice
         if [[ ! "$choice" =~ ^[Yy]$ ]]; then
-            echo "Используем существующий SSL-сертификат."
             return 0
         fi
-
-        echo "Перевыпускаем SSL-сертификат..."
-        echo "Удаляем существующий SSL-сертификат для $domain..."
-        sudo certbot delete --non-interactive --cert-name "$domain"
-
     fi
 
-    if ! sudo certbot certonly --cert-name "$domain" --standalone --agree-tos -d "$domain"; then
+    if ! docker exec "$PHP_CONTAINER_NAME" certbot certonly --force-renew --preferred-chain 'ISRG Root X1' \
+        -n --agree-tos --email "mail@$domain" -d "$domain" --webroot -w /certs/ \
+        --logs-dir /logs --max-log-backups 0 --cert-name "$domain"; then
         echo -e "${RED}Ошибка: Не удалось выпустить SSL-сертификат для $domain.${RESET}"
         return 1
     fi
-    
-    echo -e "${GREEN}SSL-сертификат для $domain успешно выпущен!${RESET}"
-    return 0
-}
-
-copy_cert() {
-    local domain=$1
-    local cert_dir="${CERTS_DIR}/$domain"
-    
-    echo "Копируем SSL-сертификат в $cert_dir..."
-    
-    if [ ! -d "${LETSENCRYPT_DIR}/$domain" ]; then
-        echo -e "${RED}Ошибка: SSL-сертификат для домена $domain не найден в ${LETSENCRYPT_DIR}/$domain.${RESET}"
-        return 1
-    fi
-    
+        
     rm -rf "$cert_dir"
     mkdir -p "$cert_dir"
     
-    if ! cp -L "${LETSENCRYPT_DIR}/$domain/fullchain.pem" "$cert_dir/fullchain.pem" || \
-       ! cp -L "${LETSENCRYPT_DIR}/$domain/privkey.pem" "$cert_dir/privkey.pem"; then
-        echo -e "${RED}Ошибка: Не удалось скопировать файлы SSL-сертификата.${RESET}"
-        return 1
-    fi
-    
-    echo -e "${GREEN}SSL-сертификат успешно скопирован в $cert_dir!${RESET}"
+    docker exec "$PHP_CONTAINER_NAME" cat "/etc/letsencrypt/live/$domain/fullchain.pem" > "$cert_dir/fullchain.pem"
+    docker exec "$PHP_CONTAINER_NAME" cat "/etc/letsencrypt/live/$domain/privkey.pem" > "$cert_dir/privkey.pem"
+
+    echo -e "${GREEN}SSL-сертификат для $domain успешно выпущен!${RESET}"
     return 0
 }
 
 remove_cert() {
     local domain=$1
+    local cert_dir="${CERTS_DIR}/$domain"
     
-    if [ ! -d "${LETSENCRYPT_DIR}/$domain" ]; then
-        echo -e "${RED}SSL-сертификат для $domain не существует.${RESET}"
+    echo "Удаляем SSL-сертификат и папку из ${CERTS_DIR}..."
+    
+    if [ -d "$cert_dir" ]; then
+        rm -rf "$cert_dir"
+        echo -e "${GREEN}SSL-сертификат и папка удалены из ${CERTS_DIR}!${RESET}"
+        return 0
+    else
+        echo -e "${RED}Ошибка: SSL-сертификат для $domain не найден в ${CERTS_DIR}.${RESET}"
         return 1
     fi
-    
-    echo "Удаляем SSL-сертификат для $domain..."
-    if ! sudo certbot delete --non-interactive --cert-name "$domain"; then
-        echo -e "${RED}Ошибка: Не удалось удалить SSL-сертификат для $domain.${RESET}"
-        return 1
-    fi
-    
-    echo "Удаляем копию SSL-сертификата из ${CERTS_DIR}/$domain..."
-    rm -rf "${CERTS_DIR}/$domain"
-    
-    echo -e "${GREEN}SSL-сертификат для $domain полностью удален из всех директорий!${RESET}"
-    return 0
 }
 
 check_service_availability() {
@@ -156,6 +91,7 @@ check_service_availability() {
         echo -e "${GREEN}Сервис $service_ip доступен из контейнера nginx!${RESET}"
         return 0
     else
+        echo -e "${RED}Ошибка: Сервис $service_ip не доступен из контейнера nginx!${RESET}"
         return 1
     fi
 }
@@ -163,24 +99,22 @@ check_service_availability() {
 install_site() {
     local domain=$1
     local service_ip=$2
+    local cert_dir="${CERTS_DIR}/$domain"
     
     local marker="# BEGIN SSL CONFIG: $domain"
     local end_marker="# END SSL CONFIG: $domain"
     
-    if [ ! -f "${CERTS_DIR}/${domain}/fullchain.pem" ] || [ ! -f "${CERTS_DIR}/${domain}/privkey.pem" ]; then
-        echo -e "${RED}Ошибка: SSL-сертификат для домена $domain не найден в ${CERTS_DIR}/${domain}.${RESET}"
-        echo -e "${RED}Сначала выпустите SSL-сертификат для этого домена.${RESET}"
-        return 1
-    fi
-
     local ip_part=$(echo "$service_ip" | cut -d':' -f1)
     local port_part=$(echo "$service_ip" | cut -d':' -f2)
+
+    if [ ! -d "$cert_dir" ] || [ ! -f "$cert_dir/fullchain.pem" ] || [ ! -f "$cert_dir/privkey.pem" ]; then
+        echo -e "${RED}Ошибка: SSL-сертификат не найден в $cert_dir. Сначала выпустите его.${RESET}"
+        return 1
+    fi
     
     if ! check_service_availability "$ip_part" "$port_part"; then
         while true; do
-            echo -e "${RED}Ошибка: Сервис $service_ip не доступен из контейнера nginx!${RESET}"
-            
-            read -rp "Изменить IP и порт сервиса? (Y/N): " choice
+            read -rp "Изменить IP и порт сервиса (в противном случае отмена операции)? (Y/N): " choice
             
             case "$choice" in
                 [Yy])
@@ -202,17 +136,14 @@ install_site() {
             esac
         done
     fi
-    
-    echo "Добавляем конфигурацию для сайта $domain..."
-    
+
+    echo "Добавляем конфигурацию сайта $domain..."
+
     if grep -q "$marker" "$INCLUDE_CONF"; then
-        echo "Конфигурация для сайта $domain уже существует."
-        read -rp "Сбросить текущую конфигурацию? (Y/N): " choice
+        read -rp "Конфигурация уже существует. Перезаписать? (Y/N): " choice
         if [[ "$choice" =~ ^[Yy]$ ]]; then
-            echo "Перезаписываем конфигурацию..."
             sed -i "/$marker/,/$end_marker/d" "$INCLUDE_CONF"
         else
-            echo "Оставляем текущую конфигурацию."
             return 1
         fi
     fi
@@ -238,34 +169,32 @@ server {
 $end_marker
 EOF
 
-    echo -e "${GREEN}Конфигурация для сайта $domain успешно добавлена!${RESET}"
+    echo -e "${GREEN}Конфигурация сайта $domain успешно добавлена!${RESET}"
     return 0
 }
 
 remove_site() {
     local domain=$1
     
-    echo "Удаляем конфигурацию для сайта $domain..."
-    
-    if grep -q "# BEGIN SSL CONFIG: $domain" "$INCLUDE_CONF"; then
+    if grep -q "^# BEGIN SSL CONFIG: $domain$" "$INCLUDE_CONF"; then
         sed -i "/# BEGIN SSL CONFIG: $domain/,/# END SSL CONFIG: $domain/d" "$INCLUDE_CONF"
-        echo -e "${GREEN}Конфигурация для сайта $domain успешно удалена!${RESET}"
+        echo -e "${GREEN}Конфигурация сайта $domain удалена!${RESET}"
         return 0
     else
-        echo -e "${RED}Конфигурация для сайта $domain не найдена.${RESET}"
+        echo -e "${RED}Конфигурация сайта $domain не найдена.${RESET}"
         return 1
     fi
 }
 
 enable_auto_renew() {
     local domain=$1
+    local cert_dir="${CERTS_DIR}/$domain"
     local marker="vpnbot_auto_renew_${domain}"
     
     echo "Настраиваем автообновление SSL-сертификата для $domain..."
     
-    if [ ! -f "${CERTS_DIR}/${domain}/fullchain.pem" ] || [ ! -f "${CERTS_DIR}/${domain}/privkey.pem" ]; then
-        echo -e "${RED}Ошибка: SSL-сертификат для домена $domain не найден в ${CERTS_DIR}/${domain}.${RESET}"
-        echo -e "${RED}Сначала выпустите SSL-сертификат для этого домена.${RESET}"
+    if [ ! -d "$cert_dir" ] || [ ! -f "$cert_dir/fullchain.pem" ] || [ ! -f "$cert_dir/privkey.pem" ]; then
+        echo -e "${RED}Ошибка: SSL-сертификат не найден в $cert_dir. Сначала выпустите его.${RESET}"
         return 1
     fi
     
@@ -273,10 +202,20 @@ enable_auto_renew() {
         echo -e "${GREEN}Автообновление SSL-сертификата для $domain уже настроено.${RESET}"
         return 0
     fi
-
-    local cron_job="@monthly /usr/bin/flock -x /tmp/certbot_renew.lock /bin/bash -c 'docker stop ${NGINX_CONTAINER_NAME} && sudo certbot renew --cert-name ${domain} --force-renewal && cp -L ${LETSENCRYPT_DIR}/${domain}/fullchain.pem ${CERTS_DIR}/${domain}/fullchain.pem && cp -L ${LETSENCRYPT_DIR}/${domain}/privkey.pem ${CERTS_DIR}/${domain}/privkey.pem && docker start ${NGINX_CONTAINER_NAME}' # ${marker}"
     
-    (crontab -l 2>/dev/null; echo "$cron_job") | crontab -
+    local crontab_cmd="@monthly bash -c '\
+PHP_CONTAINER=\$(docker ps -a --format \"{{.Names}}\" | grep -E \"^php-\" | head -n 1); \
+NGINX_CONTAINER=\$(docker ps -a --format \"{{.Names}}\" | grep -E \"^nginx-\" | head -n 1); \
+docker exec \$PHP_CONTAINER certbot certonly --force-renew --preferred-chain \"ISRG Root X1\" \
+-n --agree-tos --email \"mail@$domain\" -d \"$domain\" --webroot -w /certs/ \
+--logs-dir /logs --max-log-backups 0 --cert-name \"$domain\" && \
+docker exec \$PHP_CONTAINER cat \"/etc/letsencrypt/live/$domain/fullchain.pem\" > \
+\"${CERTS_DIR}/${domain}/fullchain.pem\" && \
+docker exec \$PHP_CONTAINER cat \"/etc/letsencrypt/live/$domain/privkey.pem\" > \
+\"${CERTS_DIR}/${domain}/privkey.pem\" && \
+docker restart \$NGINX_CONTAINER' # ${marker}"
+
+    (crontab -l 2>/dev/null || echo "") | { cat; echo "$crontab_cmd"; } | crontab -
     
     echo -e "${GREEN}Автообновление SSL-сертификата для $domain настроено (@monthly).${RESET}"
     return 0
@@ -288,13 +227,13 @@ remove_auto_renew() {
     
     echo "Удаляем автообновление SSL-сертификата для $domain..."
     
-    if crontab -l 2>/dev/null | grep -q "$marker"; then
-        (crontab -l 2>/dev/null | grep -v "$marker") | crontab -
+    if crontab -l 2>/dev/null | grep -q "${marker}[[:space:]]\\|${marker}$"; then
+        crontab -l 2>/dev/null | grep -v "$marker" | crontab -
         echo -e "${GREEN}Автообновление SSL-сертификата для $domain успешно удалено!${RESET}"
     else
         echo -e "${RED}Автообновление SSL-сертификата для $domain не найдено.${RESET}"
     fi
-        
+    
     return 0
 }
 
@@ -308,7 +247,7 @@ print_menu() {
     echo "УСТАНОВКА:"
     echo "1) Комплексная установка (SSL + конфиг сайта + автообновление)"
     echo "2) Выпустить SSL-сертификат и скопировать в vpnbot/certs"
-    echo "3) Добавить конфигурацию с сайтом в include.conf"
+    echo "3) Добавить конфигурацию сайта в include.conf"
     echo "4) Включить автообновление SSL-сертификата"
     echo ""
     echo "УДАЛЕНИЕ:"
@@ -331,43 +270,38 @@ main() {
         case $opt in
             1)
                 read -rp "Домен (например: sub.example.com): " domain
-                read -rp "IP и порт сервиса (например: 123.123.123.123:9000): " service_ip                
-                manage_nginx stop
-                issue_cert "$domain" && copy_cert "$domain"
-                manage_nginx start
-                install_site "$domain" "$service_ip"
-                manage_nginx restart
+                read -rp "IP или docker-сеть и порт сервиса (например: 10.10.0.16:9000): " service_ip
+                issue_cert "$domain"
+                install_site "$domain" "$service_ip" && restart_nginx
                 enable_auto_renew "$domain"
                 ;;
             2)
                 read -rp "Домен (например: sub.example.com): " domain
-                manage_nginx stop
-                issue_cert "$domain" && copy_cert "$domain"
-                manage_nginx start
+                issue_cert "$domain" && restart_nginx
                 ;;
             3)
                 read -rp "Домен (например: sub.example.com): " domain
-                read -rp "IP и порт сервиса (например: 123.123.123.123:9000): " service_ip
-                install_site "$domain" "$service_ip" && manage_nginx restart
+                read -rp "IP или docker-сеть и порт сервиса (например: 10.10.0.16:9000): " service_ip
+                install_site "$domain" "$service_ip" && restart_nginx
                 ;;
             4)
                 read -rp "Домен (например: sub.example.com): " domain
                 enable_auto_renew "$domain"
                 ;;
             5)
-                read -rp "Домен (например: sub.example.com): " domain                
+                read -rp "Домен (например: sub.example.com): " domain
                 remove_cert "$domain"
                 remove_site "$domain"
                 remove_auto_renew "$domain"
-                manage_nginx restart
+                restart_nginx
                 ;;
             6)
                 read -rp "Домен (например: sub.example.com): " domain
-                remove_cert "$domain"
+                remove_cert "$domain" && restart_nginx
                 ;;
             7)
                 read -rp "Домен (например: sub.example.com): " domain
-                remove_site "$domain" && manage_nginx restart
+                remove_site "$domain" && restart_nginx
                 ;;
             8)
                 read -rp "Домен (например: sub.example.com): " domain
