@@ -203,7 +203,7 @@ enable_auto_renew() {
         return 0
     fi
     
-    local crontab_cmd="@monthly bash -c '\
+    local crontab_cmd="@monthly /usr/bin/flock -x /tmp/certbot_renew.lock /bin/bash -c '\
 PHP_CONTAINER=\$(docker ps -a --format \"{{.Names}}\" | grep -E \"^php-\" | head -n 1); \
 NGINX_CONTAINER=\$(docker ps -a --format \"{{.Names}}\" | grep -E \"^nginx-\" | head -n 1); \
 docker exec \$PHP_CONTAINER certbot certonly --force-renew --preferred-chain \"ISRG Root X1\" \
