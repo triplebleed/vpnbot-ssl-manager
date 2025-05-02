@@ -1,6 +1,6 @@
-![screenshot](https://hostux.pics/images/2025/04/15/imaged370a45bba17a530.png)
+## 🛡️ VPNBOT SSL Manager
 
----
+![screenshot](https://hostux.pics/images/2025/04/15/imaged370a45bba17a530.png)
 
 ## 🚀 Быстрый старт
 
@@ -18,7 +18,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/triplebleed/vpnbot-ssl-m
 - Использовать прямую публикацию портов только на внутренних интерфейсах
 - Весь внешний трафик пропускать через Nginx-прокси с SSL
 
-#### Пример: Настройка Uptime Kuma
+#### Пример: настройка Uptime Kuma
 
 ```docker
 docker run -d \
