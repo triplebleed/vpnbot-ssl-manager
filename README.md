@@ -1,4 +1,4 @@
-## 🛡️ VPNBOT SSL Manager
+## 🛡️ VPNBOT SSL MANAGER
 
 ![screenshot](https://hostux.pics/images/2025/04/15/imaged370a45bba17a530.png)
 
