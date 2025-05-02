@@ -273,7 +273,7 @@ main() {
         case $opt in
             1)
                 read -rp "Домен (например: sub.example.com): " domain
-                read -rp "IP или docker-сеть и порт сервиса (например: 172.17.0.1:3001): " service_ip
+                read -rp "IP или docker-сеть и порт сервиса (например: uptime-kuma:3001): " service_ip
                 issue_cert "$domain"
                 install_site "$domain" "$service_ip" && restart_nginx
                 enable_auto_renew "$domain"
@@ -284,7 +284,7 @@ main() {
                 ;;
             3)
                 read -rp "Домен (например: sub.example.com): " domain
-                read -rp "IP или docker-сеть и порт сервиса (например: 172.17.0.1:3001): " service_ip
+                read -rp "IP или docker-сеть и порт сервиса (например: uptime-kuma:3001): " service_ip
                 install_site "$domain" "$service_ip" && restart_nginx
                 ;;
             4)
