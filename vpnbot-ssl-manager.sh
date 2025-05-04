@@ -29,7 +29,7 @@ restart_nginx() {
     echo "Перезапускаем контейнер $NGINX_CONTAINER_NAME..."
     docker restart "$NGINX_CONTAINER_NAME" > /dev/null && \
         echo -e "${GREEN}Контейнер $NGINX_CONTAINER_NAME перезагружен.${RESET}" || \
-        echo -e "${RED}Ошибка: не удалось перезапустить контейнер $NGINX_CONTAINER_NAME.${RESET}"
+        echo -e "${RED}Ошибка: Не удалось перезапустить контейнер $NGINX_CONTAINER_NAME.${RESET}"
 }
 
 issue_cert() {
