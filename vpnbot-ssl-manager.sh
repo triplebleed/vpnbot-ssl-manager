@@ -192,7 +192,7 @@ remove_site() {
 enable_auto_renew() {
     local domain=$1
     local cert_dir="${CERTS_DIR}/$domain"
-    local marker="vpnbot_auto_renew_${domain}"
+    local marker="auto_renew_${domain}"
     
     echo "Настраиваем автообновление SSL-сертификата для $domain..."
     
@@ -206,17 +206,7 @@ enable_auto_renew() {
         return 0
     fi
     
-    local crontab_cmd="@monthly /usr/bin/flock -x /tmp/certbot_renew.lock /bin/bash -c '\
-PHP_CONTAINER=\$(docker ps -a --format \"{{.Names}}\" | grep -E \"^php-\" | head -n 1); \
-NGINX_CONTAINER=\$(docker ps -a --format \"{{.Names}}\" | grep -E \"^nginx-\" | head -n 1); \
-docker exec \$PHP_CONTAINER certbot certonly --force-renew --preferred-chain \"ISRG Root X1\" \
--n --agree-tos --email \"mail@$domain\" -d \"$domain\" --webroot -w /certs/ \
---logs-dir /logs --max-log-backups 0 --cert-name \"$domain\" && \
-docker exec \$PHP_CONTAINER cat \"/etc/letsencrypt/live/$domain/fullchain.pem\" > \
-\"${CERTS_DIR}/${domain}/fullchain.pem\" && \
-docker exec \$PHP_CONTAINER cat \"/etc/letsencrypt/live/$domain/privkey.pem\" > \
-\"${CERTS_DIR}/${domain}/privkey.pem\" && \
-docker restart \$NGINX_CONTAINER' # ${marker}"
+    local crontab_cmd="@monthly /usr/bin/flock -x /tmp/certbot_renew.lock bash -c 'curl -fsSL https://raw.githubusercontent.com/triplebleed/vpnbot-ssl-manager/refs/heads/main/ssl-renew.sh | bash -s -- \"$domain\" \"$CERTS_DIR\"' # ${marker}"
 
     (crontab -l 2>/dev/null || echo "") | { cat; echo "$crontab_cmd"; } | crontab -
     
@@ -226,7 +216,7 @@ docker restart \$NGINX_CONTAINER' # ${marker}"
 
 remove_auto_renew() {
     local domain=$1
-    local marker="vpnbot_auto_renew_${domain}"
+    local marker="auto_renew_${domain}"
     
     echo "Удаляем автообновление SSL-сертификата для $domain..."
     
