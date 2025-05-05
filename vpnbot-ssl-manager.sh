@@ -158,6 +158,8 @@ server {
     ssl_certificate /certs/$domain/fullchain.pem;
     ssl_certificate_key /certs/$domain/privkey.pem;
 
+    client_max_body_size 0;
+
     location / {
         proxy_pass http://$service_ip;
         proxy_http_version 1.1;
