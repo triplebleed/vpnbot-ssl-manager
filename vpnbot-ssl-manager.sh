@@ -152,6 +152,7 @@ install_site() {
 $marker
 server {
     server_name $domain;
+
     listen 10.10.0.2:443 ssl http2 proxy_protocol;
     listen 10.10.1.2:443 ssl http2;
 
@@ -160,15 +161,22 @@ server {
 
     client_max_body_size 0;
 
+    real_ip_recursive on;
+    set_real_ip_from 10.10.0.10;
+
     location / {
         proxy_pass http://$service_ip;
+
         proxy_http_version 1.1;
+
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "Upgrade";
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
+
+        proxy_buffering off;
     }
 }
 $end_marker
