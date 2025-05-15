@@ -137,16 +137,6 @@ install_site() {
         done
     fi
 
-    local use_base_url="false"
-    local base_url=""
-    
-    read -rp "Использовать base-url? Нужно для приложений с поддержкой работы через путь (Y/N): " use_base_url_choice
-    if [[ "$use_base_url_choice" =~ ^[Yy]$ ]]; then
-        use_base_url="true"
-        read -rp "Введите base-url (например: /mybaseurl): " base_url
-        base_url="${base_url#/}"
-    fi
-
     echo "Добавляем конфигурацию сайта $domain..."
 
     if grep -q "$marker" "$INCLUDE_CONF"; then
@@ -158,48 +148,7 @@ install_site() {
         fi
     fi
 
-    if [ "$use_base_url" = "true" ] && [ -n "$base_url" ]; then
-        cat <<EOF >> "$INCLUDE_CONF"
-$marker
-server {
-    server_name $domain;
-
-    listen 10.10.0.2:443 ssl http2 proxy_protocol;
-    listen 10.10.1.2:443 ssl http2;
-
-    ssl_certificate /certs/$domain/fullchain.pem;
-    ssl_certificate_key /certs/$domain/privkey.pem;
-
-    client_max_body_size 0;
-
-    real_ip_recursive on;
-    set_real_ip_from 10.10.0.10;
-
-    location /$base_url/ {
-        proxy_pass http://$service_ip/;
-
-        proxy_http_version 1.1;
-
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "Upgrade";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_set_header X-Script-Name /$base_url;
-
-        proxy_buffering off;
-    }
-
-    # Перенаправление с корня на base-url
-    location = / {
-        return 404;
-    }
-}
-$end_marker
-EOF
-    else
-        cat <<EOF >> "$INCLUDE_CONF"
+    cat <<EOF >> "$INCLUDE_CONF"
 $marker
 server {
     server_name $domain;
@@ -232,7 +181,6 @@ server {
 }
 $end_marker
 EOF
-    fi
 
     echo -e "${GREEN}Конфигурация сайта $domain успешно добавлена!${RESET}"
     return 0
