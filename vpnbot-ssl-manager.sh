@@ -148,8 +148,13 @@ install_site() {
         fi
     fi
 
+    local zone_name="${domain//./_}_limit"
+
     cat <<EOF >> "$INCLUDE_CONF"
 $marker
+# Определение зоны rate limit для домена $domain
+limit_req_zone \$binary_remote_addr zone=${zone_name}:10m rate=10r/s;
+
 server {
     server_name $domain;
 
@@ -165,6 +170,8 @@ server {
     set_real_ip_from 10.10.0.10;
 
     location / {
+        limit_req zone=${zone_name} burst=20 nodelay;
+        
         proxy_pass http://$service_ip;
 
         proxy_http_version 1.1;
