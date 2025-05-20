@@ -1,6 +1,6 @@
 ## 🛡️ VPNBOT SSL MANAGER
 
-![screenshot](https://hostux.pics/images/2025/04/15/imaged370a45bba17a530.png)
+![screenshot](https://hostux.pics/images/2025/05/21/image5ec8d492170576fe.png)
 
 ## 🚀 Быстрый старт
 
