@@ -9,6 +9,7 @@ RESET="\033[0m"
 CONFIG_DIR="/root/vpnbot/config"
 CERTS_DIR="/root/vpnbot/certs" 
 INCLUDE_CONF="${CONFIG_DIR}/include.conf"
+BACKUP_FILE="${CONFIG_DIR}/include.conf.backup"
 
 init() {
     NGINX_CONTAINER_NAME=$(docker ps -a --format "{{.Names}}" | grep -E '^nginx-' | head -n 1)
@@ -94,6 +95,23 @@ check_service_availability() {
         echo -e "${RED}Ошибка: Сервис $service_ip не доступен из контейнера nginx!${RESET}"
         return 1
     fi
+}
+
+backup_include_conf() {
+    cp "$INCLUDE_CONF" "$BACKUP_FILE"
+    echo -e "${GREEN}Резервная копия include.conf создана в $BACKUP_FILE${RESET}"
+}
+
+restore_include_conf() {
+    if [ ! -f "$BACKUP_FILE" ]; then
+        echo -e "${RED}Ошибка: Резервная копия не найдена в $BACKUP_FILE${RESET}"
+        return 1
+    fi
+    
+    cp "$BACKUP_FILE" "$INCLUDE_CONF"
+    echo -e "${GREEN}Файл include.conf успешно восстановлен из резервной копии!${RESET}"
+    restart_nginx
+    return 0
 }
 
 install_site() {
@@ -198,6 +216,7 @@ $end_marker
 EOF
 
     echo -e "${GREEN}Конфигурация сайта $domain успешно добавлена!${RESET}"
+    backup_include_conf
     return 0
 }
 
@@ -207,6 +226,7 @@ remove_site() {
     if grep -q "^# BEGIN SSL CONFIG: $domain$" "$INCLUDE_CONF"; then
         sed -i "/# BEGIN SSL CONFIG: $domain/,/# END SSL CONFIG: $domain/d" "$INCLUDE_CONF"
         echo -e "${GREEN}Конфигурация сайта $domain удалена!${RESET}"
+        backup_include_conf
         return 0
     else
         echo -e "${RED}Конфигурация сайта $domain не найдена.${RESET}"
@@ -274,7 +294,9 @@ print_menu() {
     echo "7) Удалить конфигурацию сайта"
     echo "8) Отключить автообновление SSL-сертификата"
     echo ""
-    echo "9) Выход"
+    echo "9) Восстановить include.conf из резервной копии"
+    echo ""
+    echo "0) Выход"
     echo ""
 }
 
@@ -284,7 +306,7 @@ main() {
     while true; do
         print_menu
         
-        read -rp "Введите номер операции [1-9]: " opt
+        read -rp "Введите номер операции [0-9]: " opt
         case $opt in
             1)
                 read -rp "Домен (например: sub.example.com): " domain
@@ -326,6 +348,9 @@ main() {
                 remove_auto_renew "$domain"
                 ;;
             9)
+                restore_include_conf
+                ;;
+            0)
                 echo "Выход из программы..."
                 exit 0
                 ;;
