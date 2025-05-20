@@ -147,13 +147,19 @@ install_site() {
             return 1
         fi
     fi
+
+    local zone_name="${domain//./_}_limit"
+    local conn_zone_name="${domain//./_}_conn"
     
     if ! grep -q "limit_req_status 429" "$INCLUDE_CONF"; then
-        sed -i '1i limit_req_status 429;\nlimit_conn_status 429;\n\nlimit_req_zone $binary_remote_addr zone=global_req_limit:10m rate=10r/s;\nlimit_conn_zone $binary_remote_addr zone=global_conn_limit:10m;' "$INCLUDE_CONF"
+        sed -i '1i limit_req_status 429;\nlimit_conn_status 429;' "$INCLUDE_CONF"
     fi
 
     cat <<EOF >> "$INCLUDE_CONF"
 $marker
+limit_req_zone \$binary_remote_addr zone=${zone_name}:10m rate=10r/s;
+limit_conn_zone \$binary_remote_addr zone=${conn_zone_name}:10m;
+
 server {
     server_name $domain;
 
@@ -178,8 +184,8 @@ server {
     set_real_ip_from 10.10.0.10;
 
     location / {
-        limit_req zone=global_req_limit burst=20 nodelay;
-        limit_conn global_conn_limit 10;
+        limit_req zone=${zone_name} burst=20 nodelay;
+        limit_conn ${conn_zone_name} 10;
         
         proxy_pass http://$service_ip;
         proxy_http_version 1.1;
