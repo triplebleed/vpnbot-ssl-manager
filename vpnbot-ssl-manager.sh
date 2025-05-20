@@ -150,13 +150,15 @@ install_site() {
 
     local zone_name="${domain//./_}_limit"
     local conn_zone_name="${domain//./_}_conn"
+    
+    if ! grep -q "limit_req_status 429" "$INCLUDE_CONF"; then
+        sed -i '1i limit_req_status 429;\nlimit_conn_status 429;' "$INCLUDE_CONF"
+    fi
 
     cat <<EOF >> "$INCLUDE_CONF"
 $marker
 limit_req_zone \$binary_remote_addr zone=${zone_name}:10m rate=10r/s;
 limit_conn_zone \$binary_remote_addr zone=${conn_zone_name}:10m;
-limit_req_status 429;
-limit_conn_status 429;
 
 server {
     server_name $domain;
