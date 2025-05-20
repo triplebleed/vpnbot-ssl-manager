@@ -149,11 +149,14 @@ install_site() {
     fi
 
     local zone_name="${domain//./_}_limit"
+    local conn_zone_name="${domain//./_}_conn"
 
     cat <<EOF >> "$INCLUDE_CONF"
 $marker
-# Определение зоны rate limit для домена $domain
 limit_req_zone \$binary_remote_addr zone=${zone_name}:10m rate=10r/s;
+limit_conn_zone \$binary_remote_addr zone=${conn_zone_name}:10m;
+limit_req_status 429;
+limit_conn_status 429;
 
 server {
     server_name $domain;
@@ -163,6 +166,15 @@ server {
 
     ssl_certificate /certs/$domain/fullchain.pem;
     ssl_certificate_key /certs/$domain/privkey.pem;
+    ssl_trusted_certificate /certs/$domain/fullchain.pem;
+    
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:MozSSL:1m;
+    ssl_session_tickets off;
+    ssl_stapling on;
+    ssl_stapling_verify on;
 
     client_max_body_size 0;
 
@@ -171,18 +183,16 @@ server {
 
     location / {
         limit_req zone=${zone_name} burst=20 nodelay;
+        limit_conn ${conn_zone_name} 10;
         
         proxy_pass http://$service_ip;
-
         proxy_http_version 1.1;
-
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "Upgrade";
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
-
         proxy_buffering off;
     }
 }
