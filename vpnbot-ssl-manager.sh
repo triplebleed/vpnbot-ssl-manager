@@ -9,7 +9,7 @@ RESET="\033[0m"
 CONFIG_DIR="/root/vpnbot/config"
 CERTS_DIR="/root/vpnbot/certs" 
 INCLUDE_CONF="${CONFIG_DIR}/include.conf"
-BACKUP_FILE="${CONFIG_DIR}/include.conf.backup"
+BACKUP_FILE="/root/include.conf.backup"
 
 init() {
     NGINX_CONTAINER_NAME=$(docker ps -a --format "{{.Names}}" | grep -E '^nginx-' | head -n 1)
