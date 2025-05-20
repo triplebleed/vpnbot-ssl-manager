@@ -150,10 +150,6 @@ install_site() {
 
     local zone_name="${domain//./_}_limit"
     local conn_zone_name="${domain//./_}_conn"
-    
-    if ! grep -q "limit_req_status 429" "$INCLUDE_CONF"; then
-        sed -i '1i limit_req_status 429;\nlimit_conn_status 429;' "$INCLUDE_CONF"
-    fi
 
     cat <<EOF >> "$INCLUDE_CONF"
 $marker
