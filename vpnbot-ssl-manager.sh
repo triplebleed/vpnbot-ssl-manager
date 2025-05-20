@@ -149,7 +149,7 @@ install_site() {
     fi
     
     if ! grep -q "limit_req_status 429" "$INCLUDE_CONF"; then
-        sed -i '1i limit_req_status 429;\nlimit_conn_status 429;\n\nlimit_req_zone \\$binary_remote_addr zone=global_req_limit:10m rate=10r/s;\nlimit_conn_zone \\$binary_remote_addr zone=global_conn_limit:10m;' "$INCLUDE_CONF"
+        sed -i '1i limit_req_status 429;\nlimit_conn_status 429;\n\nlimit_req_zone $binary_remote_addr zone=global_req_limit:10m rate=10r/s;\nlimit_conn_zone $binary_remote_addr zone=global_conn_limit:10m;' "$INCLUDE_CONF"
     fi
 
     cat <<EOF >> "$INCLUDE_CONF"
