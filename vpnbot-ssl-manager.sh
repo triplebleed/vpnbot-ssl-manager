@@ -97,7 +97,7 @@ verify_service_params() {
     local service_ip=$1
     read -r ip_part port_part <<< "$(parse_service_ip "$service_ip")"
     
-    if ! check_service_availability "$ip_part" "$port_part"; then
+    if ! check_service_availability "$ip_part" "$port_part" > /dev/null; then
         while true; do
             read -rp "Изменить IP и порт сервиса (в противном случае отмена операции)? (Y/N): " choice
             
@@ -106,17 +106,17 @@ verify_service_params() {
                     read -rp "Введите новый адрес сервиса (IP:порт): " service_ip
                     read -r ip_part port_part <<< "$(parse_service_ip "$service_ip")"
                     
-                    if check_service_availability "$ip_part" "$port_part"; then
+                    if check_service_availability "$ip_part" "$port_part" > /dev/null; then
                         echo "$service_ip"
                         return 0
                     fi
                     ;;
                 [Nn])
-                    echo "Операция отменена пользователем."
+                    echo "Операция отменена пользователем." >&2
                     return 1
                     ;;
                 *)
-                    echo "Неверный выбор. Пожалуйста, введите Y или N."
+                    echo "Неверный выбор. Пожалуйста, введите Y или N." >&2
                     ;;
             esac
         done
@@ -202,9 +202,6 @@ install_site() {
         fi
     fi
 
-    local zone_name="${domain//./_}_limit"
-    local conn_zone_name="${domain//./_}_conn"
-
     cat <<EOF >> "$INCLUDE_CONF"
 $marker
 server {
@@ -230,7 +227,7 @@ server {
     real_ip_recursive on;
     set_real_ip_from 10.10.0.10;
 
-    location / {    
+    location / {        
         proxy_pass http://$service_ip;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
