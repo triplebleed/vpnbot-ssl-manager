@@ -97,7 +97,7 @@ verify_service_params() {
     local service_ip=$1
     read -r ip_part port_part <<< "$(parse_service_ip "$service_ip")"
     
-    if ! check_service_availability "$ip_part" "$port_part" > /dev/null; then
+    if ! check_service_availability "$ip_part" "$port_part"; then
         while true; do
             read -rp "Изменить IP и порт сервиса (в противном случае отмена операции)? (Y/N): " choice
             
@@ -106,17 +106,17 @@ verify_service_params() {
                     read -rp "Введите новый адрес сервиса (IP:порт): " service_ip
                     read -r ip_part port_part <<< "$(parse_service_ip "$service_ip")"
                     
-                    if check_service_availability "$ip_part" "$port_part" > /dev/null; then
+                    if check_service_availability "$ip_part" "$port_part"; then
                         echo "$service_ip"
                         return 0
                     fi
                     ;;
                 [Nn])
-                    echo "Операция отменена пользователем." >&2
+                    echo "Операция отменена пользователем."
                     return 1
                     ;;
                 *)
-                    echo "Неверный выбор. Пожалуйста, введите Y или N." >&2
+                    echo "Неверный выбор. Пожалуйста, введите Y или N."
                     ;;
             esac
         done
