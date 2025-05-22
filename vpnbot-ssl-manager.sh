@@ -351,7 +351,7 @@ remove_auto_renew() {
 print_menu() {
     clear
     echo "╔══════════════════════════════════════════════════╗"
-    echo "║            ${BOLD}VPNBOT SSL MANAGER${RESET}                ║"
+    echo "║            ${RED}VPNBOT SSL MANAGER${RESET}                ║"
     echo "╚══════════════════════════════════════════════════╝"
     echo "Выберите действие:"
     echo ""
