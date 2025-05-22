@@ -95,7 +95,8 @@ check_service_availability() {
 
 verify_service_params() {
     local service_ip=$1
-    read -r ip_part port_part <<< "$(parse_service_ip "$service_ip")"
+    local ip_part=$(echo "$service_ip" | cut -d':' -f1)
+    local port_part=$(echo "$service_ip" | cut -d':' -f2)
     
     if ! check_service_availability "$ip_part" "$port_part"; then
         while true; do
@@ -104,11 +105,11 @@ verify_service_params() {
             case "$choice" in
                 [Yy])
                     read -rp "Введите новый адрес сервиса (IP:порт): " service_ip
-                    read -r ip_part port_part <<< "$(parse_service_ip "$service_ip")"
+                    ip_part=$(echo "$service_ip" | cut -d':' -f1)
+                    port_part=$(echo "$service_ip" | cut -d':' -f2)
                     
                     if check_service_availability "$ip_part" "$port_part"; then
-                        echo "$service_ip"
-                        return 0
+                        break
                     fi
                     ;;
                 [Nn])
