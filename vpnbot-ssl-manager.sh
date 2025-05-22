@@ -166,14 +166,8 @@ install_site() {
         fi
     fi
 
-    local zone_name="${domain//./_}_limit"
-    local conn_zone_name="${domain//./_}_conn"
-
     cat <<EOF >> "$INCLUDE_CONF"
 $marker
-limit_req_zone \$binary_remote_addr zone=${zone_name}:10m rate=10r/s;
-limit_conn_zone \$binary_remote_addr zone=${conn_zone_name}:10m;
-
 server {
     server_name $domain;
 
@@ -197,10 +191,7 @@ server {
     real_ip_recursive on;
     set_real_ip_from 10.10.0.10;
 
-    location / {
-        limit_req zone=${zone_name} burst=20 nodelay;
-        limit_conn ${conn_zone_name} 10;
-        
+    location / {        
         proxy_pass http://$service_ip;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
